@@ -130,7 +130,7 @@ func (h ConnectorsHandler) Patch(w http.ResponseWriter, r *http.Request) {
 				return nil, serr
 			}
 
-			resource, serr := presenters.PresentConnector(dbresource)
+			resource, serr := presenters.PresentConnector(&dbresource.Connector)
 			if serr != nil {
 				return nil, serr
 			}
@@ -140,7 +140,7 @@ func (h ConnectorsHandler) Patch(w http.ResponseWriter, r *http.Request) {
 				return nil, errors.BadRequest("invalid connector type id: %s", resource.ConnectorTypeId)
 			}
 
-			originalSecrets, err := getSecretRefs(dbresource, ct)
+			originalSecrets, err := getSecretRefs(&dbresource.Connector, ct)
 			if err != nil {
 				return nil, errors.GeneralError("could not get existing secrets: %v", err)
 			}
@@ -174,7 +174,7 @@ func (h ConnectorsHandler) Patch(w http.ResponseWriter, r *http.Request) {
 			resource.DeploymentLocation = patch.DeploymentLocation
 
 			// If we didn't change anything, then just skip the update...
-			originalResource, _ := presenters.PresentConnector(dbresource)
+			originalResource, _ := presenters.PresentConnector(&dbresource.Connector)
 			if reflect.DeepEqual(originalResource, resource) {
 				return originalResource, nil
 			}
@@ -348,12 +348,12 @@ func (h ConnectorsHandler) Get(w http.ResponseWriter, r *http.Request) {
 				resource.ConnectorSpec = api.JSON("{}")
 				resource.Status.Phase = "bad-connector-type"
 			} else {
-				if err := stripSecretReferences(resource, ct); err != nil {
+				if err := stripSecretReferences(&resource.Connector, ct); err != nil {
 					return nil, err
 				}
 			}
 
-			return presenters.PresentConnector(resource)
+			return presenters.PresentConnectorWithError(resource)
 		},
 	}
 	handlers.HandleGet(w, r, cfg)
@@ -386,7 +386,7 @@ func (h ConnectorsHandler) Delete(w http.ResponseWriter, r *http.Request) {
 				}
 
 				c.DesiredState = dbapi.ConnectorStatusPhaseDeleted
-				err := h.connectorsService.Update(r.Context(), c)
+				err := h.connectorsService.Update(r.Context(), &c.Connector)
 				if err != nil {
 					return nil, err
 				}
@@ -429,12 +429,12 @@ func (h ConnectorsHandler) List(w http.ResponseWriter, r *http.Request) {
 					resource.ConnectorSpec = api.JSON("{}")
 					resource.Status.Phase = "bad-connector-type"
 				} else {
-					if err := stripSecretReferences(resource, ct); err != nil {
+					if err := stripSecretReferences(&resource.Connector, ct); err != nil {
 						return nil, err
 					}
 				}
 
-				converted, err := presenters.PresentConnector(resource)
+				converted, err := presenters.PresentConnectorWithError(resource)
 				if err != nil {
 					glog.Errorf("connector id='%s' presentation failed: %v", resource.ID, err)
 					return nil, errors.GeneralError("internal error")
